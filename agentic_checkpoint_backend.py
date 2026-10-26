@@ -7,10 +7,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
+    model="gemini-2.5-flash",
     timeout=20,
-    max_retries=0,
-    max_output_tokens=128
+    max_retries=2,
 )
 
 from langgraph.graph.message import add_messages
