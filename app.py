@@ -11,7 +11,6 @@ CONFIG = {'configurable': {'thread_id': 'thread-1'}}
 if 'message_history' not in st.session_state:
     st.session_state['message_history'] = []
 
-
 # loading the conversation history
 for message in st.session_state['message_history']:
     with st.chat_message(message['role']):
@@ -26,10 +25,10 @@ if user_input:
         st.text(user_input)
 
 
-
     # first add the message to message_history
     with st.chat_message('assistant'):
 
+        # streaming feature applied here
         ai_message = st.write_stream(
             message_chunk.text for message_chunk, metadata in chatbot.stream(
                 {'messages': [HumanMessage(content=user_input)]},
@@ -39,3 +38,5 @@ if user_input:
         )
 
     st.session_state['message_history'].append({'role': 'assistant', 'content': ai_message})
+
+    # applying the threading concept here
