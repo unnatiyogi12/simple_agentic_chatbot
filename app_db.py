@@ -1,4 +1,4 @@
-from agentic_chatbot_db_backend import chatbot , get_all_threads
+from agentic_chatbot_db_backend import chatbot, get_all_threads
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 import streamlit as st
 import uuid 
@@ -23,7 +23,6 @@ def reset_chat():
 
     # Generate and assign a new thread ID
     st.session_state["thread_id"] = generate_thread_id()
-    st.query_params["thread_id"] = st.session_state["thread_id"]
 
     # Clear the current chat messages from the UI
     st.session_state["message_history"] = []
@@ -50,54 +49,25 @@ def load_conversation(thread_id):
     return state.values.get("messages", [])
 
 
-def format_messages(messages):
-    formatted_messages = []
-
-    for message in messages:
-        if isinstance(message, HumanMessage):
-            role = "user"
-        elif isinstance(message, AIMessage):
-            role = "assistant"
-        else:
-            continue
-
-        formatted_messages.append({
-            "role": role,
-            "content": message.content
-        })
-
-    return formatted_messages
-
 
 # Display the main application title
 st.title("Agentic Chatbot with LangGraph")
 
 
+# Create message_history when the app runs for the first time
+if "message_history" not in st.session_state:
+    st.session_state["message_history"] = []
+
+
+# Create a thread ID when the app runs for the first time
+if "thread_id" not in st.session_state:
+    st.session_state["thread_id"] = generate_thread_id()
+
+
 # Create a list for storing all conversation thread IDs
 if "chat_threads" not in st.session_state:
-    threads = get_all_threads()
+    st.session_state["chat_threads"] = get_all_threads()
 
-    if not isinstance(threads, list):
-        threads = []
-
-    st.session_state["chat_threads"] = threads
-
-
-# Restore the thread from the URL after a page refresh. If no thread is
-# specified, open the most recently saved conversation, or start a new one.
-if "thread_id" not in st.session_state:
-    thread_id = st.query_params.get("thread_id")
-    if not thread_id:
-        threads = st.session_state["chat_threads"]
-        thread_id = threads[-1] if threads else generate_thread_id()
-
-    st.session_state["thread_id"] = thread_id
-    st.query_params["thread_id"] = thread_id
-    st.session_state["message_history"] = format_messages(
-        load_conversation(thread_id)
-    )
-elif "message_history" not in st.session_state:
-    st.session_state["message_history"] = []
 
 
 # Add the current thread to the conversation list
@@ -120,6 +90,8 @@ if st.sidebar.button("New Chat"):
     st.rerun()
 
 
+
+
 # Display all conversation threads in reverse order
 # This shows the newest conversation first
 for thread_id in st.session_state["chat_threads"][::-1]:
@@ -132,14 +104,44 @@ for thread_id in st.session_state["chat_threads"][::-1]:
 
         # Set the selected thread as the current thread
         st.session_state["thread_id"] = thread_id
-        st.query_params["thread_id"] = thread_id
-        st.session_state["message_history"] = format_messages(
-            load_conversation(thread_id)
-        )
 
+        # Load the messages saved under the selected thread
+        messages = load_conversation(thread_id)
+
+        # Temporary list for converting LangChain messages
+        # into Streamlit's required message format
+        temp_messages = []
+
+
+        # Loop through all saved messages
+        for message in messages:
+
+            # Check whether the message was sent by the user
+            if isinstance(message, HumanMessage):
+                role = "user"
+
+            # Check whether the message was sent by the AI
+            elif isinstance(message, AIMessage):
+                role = "assistant"
+
+            # Ignore other message types, such as ToolMessage
+            else:
+                continue
+
+
+            # Convert the LangChain message into a dictionary
+            temp_messages.append({
+                "role": role,
+                "content": message.content
+            })
+
+
+        # Replace the current UI history with the selected conversation
+        st.session_state["message_history"] = temp_messages
 
         # Rerun the application to display the loaded messages
         st.rerun()
+
 
 
 # ========================= Main chat interface =========================
@@ -152,6 +154,7 @@ for message in st.session_state["message_history"]:
 
         # Display the message content
         st.text(message["content"])
+
 
 
 # Create the chat input box
@@ -175,11 +178,15 @@ if user_input:
 
     # Pass the current thread ID to LangGraph
     # LangGraph uses this ID to save and retrieve conversation memory
+
     CONFIG = {
-        "configurable": {
+        "configurable": {"thread_id": st.session_state["thread_id"]},
+        "metadata": {
             "thread_id": st.session_state["thread_id"]
-        }
+        },
+        "run_name": "chat_trace",
     }
+
 
 
     # Create the assistant chat-message container
