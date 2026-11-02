@@ -1,4 +1,4 @@
-from agentic_chatbot_hitl_backend import (
+from agentic_chatbot_with_HITL import (
     chatbot,
     get_all_threads,
     ingest_rag_document
@@ -248,8 +248,15 @@ def resume_hitl_execution(decision):
                         AIMessage
                     ):
 
-                        if message_chunk.content:
+                        if isinstance(message_chunk.content, str):
                             yield message_chunk.content
+
+                        elif isinstance(message_chunk.content, list):
+                            for item in message_chunk.content:
+                                if isinstance(item, dict) and item.get("type") == "text":
+                                    text = item.get("text", "")
+                                    if text:
+                                        yield text
 
             # Display the streamed final answer
             resumed_ai_message = st.write_stream(
@@ -404,9 +411,22 @@ for thread_id in st.session_state["chat_threads"][::-1]:
                 continue
 
             # Convert the LangChain message into a dictionary
+            if isinstance(message.content, str):
+                display_content = message.content
+
+            elif isinstance(message.content, list):
+                display_content = " ".join(
+                    item.get("text", "")
+                    for item in message.content
+                    if isinstance(item, dict) and item.get("type") == "text"
+                )
+
+            else:
+                display_content = str(message.content)
+
             temp_messages.append({
                 "role": role,
-                "content": message.content
+                "content": display_content
             })
 
         # Replace the current UI history with the selected conversation
@@ -431,8 +451,8 @@ for message in st.session_state["message_history"]:
     # Create either a user chat bubble or assistant chat bubble
     with st.chat_message(message["role"]):
 
-        # Display the message content
-        st.text(message["content"])
+        # Render Markdown so headings, lists, bold text and code blocks display properly
+        st.markdown(message["content"])
 
 
 # ========================= HITL approval interface =========================
@@ -650,7 +670,15 @@ if user_input:
                     message_chunk,
                     AIMessage
                 ):
-                    yield message_chunk.content
+                    if isinstance(message_chunk.content, str):
+                        yield message_chunk.content
+
+                    elif isinstance(message_chunk.content, list):
+                        for item in message_chunk.content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                text = item.get("text", "")
+                                if text:
+                                    yield text
 
             # ========================= HITL ADDED =========================
 
